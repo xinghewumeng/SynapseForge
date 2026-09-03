@@ -95,7 +95,17 @@ class WorkspaceVault:
             else:
                 category = "imports"
 
-        target_dir = self.workspace_root / category
+        if category not in VAULT_STRUCTURE:
+            return {
+                "ok": False,
+                "error": f"Unknown vault category '{category}'. Allowed: {', '.join(VAULT_STRUCTURE)}",
+            }
+
+        target_dir = (self.workspace_root / category).resolve()
+        try:
+            target_dir.relative_to(self.workspace_root.resolve())
+        except ValueError:
+            return {"ok": False, "error": "Import destination escapes workspace vault"}
         target_dir.mkdir(parents=True, exist_ok=True)
 
         file_hash = self._get_file_hash(src)

@@ -17,6 +17,60 @@ from typing import Any, Dict, List, Optional, Set
 from synapseforge.core.ast_parser import MarkdownASTParser
 
 
+def _matching_brace(text: str, open_idx: int) -> Optional[int]:
+    """Return the index of the brace that closes ``text[open_idx]``, skipping quoted ``}``."""
+    if open_idx < 0 or open_idx >= len(text) or text[open_idx] != "{":
+        return None
+    depth = 0
+    in_quote = False
+    escape = False
+    for i in range(open_idx, len(text)):
+        ch = text[i]
+        if in_quote:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_quote = False
+            continue
+        if ch == '"':
+            in_quote = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return i
+    return None
+
+
+def _iter_bib_entries(content: str):
+    """Yield ``(entry_type, cite_key, body, raw)`` for each BibTeX entry.
+
+    Brace-matched so compact one-line entries (no newline before ``}``) parse
+    the same as the conventional multiline form.
+    """
+    i = 0
+    n = len(content)
+    while i < n:
+        at = content.find("@", i)
+        if at < 0:
+            return
+        header = re.match(r"@([a-zA-Z]+)\s*\{\s*([a-zA-Z0-9_\-:]+)\s*,", content[at:])
+        if not header:
+            i = at + 1
+            continue
+        brace = content.find("{", at)
+        end = _matching_brace(content, brace)
+        if end is None:
+            return
+        body = content[at + header.end() : end]
+        raw = content[at : end + 1]
+        yield header.group(1), header.group(2), body, raw
+        i = end + 1
+
+
 def _bib_field(body: str, name: str) -> str:
     """Read a BibTeX field, keeping quoted titles and nested braces intact."""
     match = re.search(rf"{re.escape(name)}\s*=\s*", body, re.IGNORECASE)
@@ -73,12 +127,7 @@ class CiteTool:
 
         content = self.bib_file.read_text(encoding="utf-8")
         entries = []
-        pattern = r'@([a-zA-Z]+)\s*\{\s*([a-zA-Z0-9_\-:]+)\s*,\s*([\s\S]*?)\n\}'
-        for match in re.finditer(pattern, content):
-            entry_type = match.group(1)
-            cite_key = match.group(2)
-            body = match.group(3)
-
+        for entry_type, cite_key, body, raw in _iter_bib_entries(content):
             entries.append({
                 "key": cite_key,
                 "type": entry_type,
@@ -86,7 +135,7 @@ class CiteTool:
                 "author": _bib_field(body, "author"),
                 "year": _bib_year(body),
                 "journal": _bib_field(body, "journal") or _bib_field(body, "booktitle"),
-                "raw": match.group(0),
+                "raw": raw,
             })
         return entries
 

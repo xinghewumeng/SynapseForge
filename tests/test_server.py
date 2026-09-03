@@ -124,3 +124,40 @@ def test_server_session_get_and_post(remote_server):
         res_data = json.loads(resp.read().decode("utf-8"))
         assert res_data["ok"] is True
         assert res_data["session"]["room_id"] == "room-special-sync"
+
+
+def test_server_citations_use_workspace_bibliography(remote_server):
+    base, workspace = remote_server
+    (workspace / "bibliography.bib").write_text(
+        "@article{workspaceonly2026,\n  title={Workspace Only},\n  author={Local Author},\n  year={2026}\n}\n",
+        encoding="utf-8",
+    )
+    with urllib.request.urlopen(f"{base}/api/citations") as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+    assert data["ok"] is True
+    keys = [c["key"] for c in data["citations"]]
+    assert "workspaceonly2026" in keys
+
+    payload = json.dumps({
+        "key": "addedfromstudio2026",
+        "type": "article",
+        "title": "Added From Studio",
+        "author": "Remote Human",
+        "year": "2026",
+        "journal": "SynapseForge",
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        f"{base}/api/citations/add",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req) as resp:
+        added = json.loads(resp.read().decode("utf-8"))
+    assert added.get("ok") is True
+    workspace_bib = (workspace / "bibliography.bib").read_text(encoding="utf-8")
+    assert "addedfromstudio2026" in workspace_bib
+    cwd_bib = Path("bibliography.bib")
+    if cwd_bib.exists():
+        assert "addedfromstudio2026" not in cwd_bib.read_text(encoding="utf-8")
+

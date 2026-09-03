@@ -9,10 +9,16 @@ import json
 import os
 import sys
 import traceback
+from pathlib import Path
 
 from synapseforge.core.semantic_diff import SemanticASTDiffer
 from synapseforge.core.team_bus import open_bus
 from synapseforge.tools.cite_tool import CiteTool
+
+
+def _cite_tool() -> CiteTool:
+    root = os.environ.get("SYNAPSEFORGE_WORKSPACE") or os.getcwd()
+    return CiteTool(workspace_root=Path(root))
 
 
 SERVER_NAME = "synapseforge-team"
@@ -297,7 +303,7 @@ def call_tool(store, name, args):
             res = differ.diff_texts(args.get("text_a", ""), args.get("text_b", ""), "Doc A", "Doc B")
         return {"ok": True, "diff": res.to_dict()}
     if name == "team_cite_lookup":
-        cite = CiteTool()
+        cite = _cite_tool()
         if "doi" in args and args["doi"]:
             lookup_res = cite.lookup_doi(args["doi"])
             if lookup_res.get("ok") and args.get("add_to_bib"):
@@ -315,7 +321,7 @@ def call_tool(store, name, args):
             return cite.search_crossref(args["query"])
         return {"ok": False, "error": "Either 'doi' or 'query' must be provided"}
     if name == "team_cite_validate":
-        cite = CiteTool()
+        cite = _cite_tool()
         return cite.validate_citations()
 
     if name not in dispatch:

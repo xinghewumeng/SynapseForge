@@ -68,7 +68,7 @@ class SynapseForgeRemoteHandler(SimpleHTTPRequestHandler):
             return
 
         elif path == "/api/citations":
-            cite = CiteTool()
+            cite = CiteTool(workspace_root=self.root_dir)
             self._send_json({"ok": True, "citations": cite.list_citations()})
             return
 
@@ -167,7 +167,7 @@ class SynapseForgeRemoteHandler(SimpleHTTPRequestHandler):
             res = snap.rollback(commit_hash=data.get("commit_hash", "HEAD~1"), file_path=data.get("file_path"))
             self._send_json(res)
         elif path == "/api/citations/add":
-            cite = CiteTool()
+            cite = CiteTool(workspace_root=self.root_dir)
             res = cite.add_bibtex_entry(
                 key=data.get("key", "newcite2026"),
                 entry_type=data.get("type", "article"),
