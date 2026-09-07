@@ -24,7 +24,7 @@ jobs:
           cache: 'pip'
 
       - name: Set up Typst CLI
-        uses: typst-community/setup-typst@v3
+        uses: typst-community/setup-typst@v5
         with:
           typst-version: 'latest'
 
